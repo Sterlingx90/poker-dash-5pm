@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Poker Dash: Suburban 5PM</title>
+  <meta name="theme-color" content="#0b0f14">
+  <style>
+    :root{
+      --bg:#0b0f14; --hud:#101823; --fg:#e7f2ff; --accent:#52d07d;
+      --muted:#8fa3b6; --danger:#ff6b6b; --good:#86efac;
+    }
+    html, body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:ui-rounded, system-ui, -apple-system, "SF Pro", Helvetica, Arial, sans-serif}
+    #wrap{position:fixed; inset:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; display:grid; grid-template-rows: 1fr auto; place-items:center;}
+    canvas{image-rendering: pixelated; image-rendering: crisp-edges; background:#1b2636; box-shadow:0 12px 40px rgba(0,0,0,.5); border-radius:16px;}
+    .hud{position:fixed; left:12px; top:calc(env(safe-area-inset-top) + 8px); display:flex; gap:8px; align-items:center; background:rgba(0,0,0,0.35); padding:8px 10px; border-radius:10px; backdrop-filter: blur(8px);}
+    .pill{font-weight:800; font-size:12px; letter-spacing:.3px; color:#cfe7ff; background:#0f1724; padding:6px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.08)}
+    .pill.good{color:#0e301f; background:#86efac; border-color:#00000022}
+    .pill.bad{background:#ffb4b4; color:#2a0b0b}
+    .center{position:fixed; inset:0; display:grid; place-items:center; pointer-events:none;}
+    .panel{pointer-events:auto; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.08); padding:16px; border-radius:16px; width:min(520px, 92vw); box-shadow:0 20px 60px rgba(0,0,0,.45)}
+    .title{font-weight:900; font-size:22px; margin-bottom:6px}
+    .subtitle{color:var(--muted); font-size:14px}
+    .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    button{appearance:none; border:none; background:var(--accent); color:#042013; font-weight:900; padding:10px 14px; border-radius:12px; box-shadow:0 10px 20px rgba(82,208,125,.35); cursor:pointer; font-size:16px}
+    button.secondary{background:#2b3546; color:#dce7f5; box-shadow:0 10px 20px rgba(0,0,0,.25)}
+    .controls{display:grid; grid-template-columns: 80px 80px; grid-template-rows:80px 80px; gap:10px; position:fixed; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px);}
+    .dpad{position:fixed; left:10px; bottom:calc(env(safe-area-inset-bottom) + 10px); display:grid; grid-template-columns:60px 60px 60px; grid-template-rows:60px 60px 60px; gap:6px}
+    .btn{background:#111a27aa; border:1px solid #ffffff14; border-radius:12px; display:grid; place-items:center; user-select:none; -webkit-user-select:none; touch-action:manipulation}
+    .btn:active{transform:translateY(1px)}
+    .btn span{filter:drop-shadow(0 1px 0 rgba(0,0,0,.6)); font-weight:900}
+    .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 90px); background:#0e1624; padding:8px 12px; border-radius:10px; border:1px solid #ffffff12; color:#cfe7ff; opacity:0; transition:opacity .25s; pointer-events:none}
+    .toast.show{opacity:1}
+    .dialog{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 10px); width:min(680px, 95vw); background:#0e1624; border:1px solid #ffffff12; border-radius:14px; padding:10px 12px; display:none}
+    .dialog h3{margin:0 0 4px; font-size:14px}
+    .dialog p{margin:0; color:#cfe7ff; font-size:13px; line-height:1.4}
+    .credits{position:fixed; right:12px; top:calc(env(safe-area-inset-top) + 8px); background:rgba(0,0,0,.35); padding:6px 8px; border-radius:10px; font-size:12px}
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="hud">
+      <div class="pill" id="timePill">Time: 4:50 PM</div>
+      <div class="pill" id="goalPill">Goal: Nick’s House by 5:00</div>
+      <div class="pill" id="scorePill">Best: <span id="bestSpan">—</span></div>
+    </div>
+    <div class="credits">Poker Dash • Retro browser game</div>
+    <canvas id="game" width="320" height="180" aria-label="Poker Dash Canvas"></canvas>
+    <div class="center" id="overlay">
+      <div class="panel">
+        <div class="title">Poker Dash: Suburban 5PM</div>
+        <div class="subtitle">A tiny retro browser quest. Make it to <b>Nick’s house</b> by 5:00 PM. <br>Watch out for the neighborhood’s most “helpful” people: Remy, Ryan, Alex, and Stephen.</div>
+        <div class="btns">
+          <button id="startBtn">Start</button>
+          <button class="secondary" id="howBtn">How to Play</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">Press A to talk</div>
+    <div class="dialog" id="dialog">
+      <h3 id="dlgName"></h3>
+      <p id="dlgText"></p>
+    </div>
+
+    <div class="dpad" id="dpad">
+      <div></div> <div class="btn" data-dir="up"><span>▲</span></div> <div></div>
+      <div class="btn" data-dir="left"><span>◀︎</span></div> <div></div> <div class="btn" data-dir="right"><span>▶︎</span></div>
+      <div></div> <div class="btn" data-dir="down"><span>▼</span></div> <div></div>
+    </div>
+    <div class="controls">
+      <div class="btn" id="btnA"><span>A</span></div>
+      <div class="btn" id="btnB"><span>B</span></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  function fit() {
+    const maxW = Math.min(680, window.innerWidth - 16);
+    const maxH = window.innerHeight - 160;
+    const scale = Math.floor(Math.min(maxW / canvas.width, maxH / canvas.height)) || 1;
+    canvas.style.width = (canvas.width * scale) + 'px';
+    canvas.style.height = (canvas.height * scale) + 'px';
+  }
+  window.addEventListener('resize', fit);
+
+  const TILE = 16;
+  const MAP_W = 32, MAP_H = 20;
+
+  const T = { GRASS:0, ROAD:1, SIDEWALK:2, FENCE:3, HOUSE:4, DOOR:5, TREE:6, WATER:7, SIGN:8, FLOWER:9 };
+  const map = new Array(MAP_W * MAP_H).fill(T.GRASS);
+  function idx(x,y){ return y*MAP_W+x; }
+
+  for (let x=0;x<MAP_W;x++){
+    map[idx(x,10)] = T.ROAD;
+    map[idx(x,9)]  = T.SIDEWALK;
+    map[idx(x,11)] = T.SIDEWALK;
+  }
+  for (let y=0;y<MAP_H;y++){
+    map[idx(16,y)] = T.ROAD;
+    map[idx(15,y)] = T.SIDEWALK;
+    map[idx(17,y)] = T.SIDEWALK;
+  }
+
+  function houseRect(x,y,w,h,doorX,doorY){
+    for (let j=0;j<h;j++) for (let i=0;i<w;i++) map[idx(x+i, y+j)] = T.HOUSE;
+    map[idx(x+doorX, y+doorY)] = T.DOOR;
+  }
+  houseRect(4,3,6,4,2,3);
+  houseRect(12,2,6,5,3,4);
+  houseRect(20,3,6,4,3,3);
+  houseRect(25,2,6,5,2,4);
+  houseRect(22,14,8,5,4,4);
+  map[idx(21,14)] = T.FENCE; map[idx(21,15)] = T.FENCE; map[idx(21,16)] = T.FENCE;
+
+  const deco = [
+    [7,8,T.TREE],[6,8,T.TREE],[9,8,T.TREE],
+    [2,12,T.FLOWER],[3,12,T.FLOWER],[4,12,T.FLOWER],
+    [27,13,T.TREE],[28,13,T.TREE],[26,13,T.TREE],
+    [14,5,T.SIGN]
+  ];
+  deco.forEach(([x,y,t]) => map[idx(x,y)] = t);
+
+  const solid = new Set([T.FENCE, T.HOUSE, T.TREE, T.WATER]);
+
+  const npcs = [
+    {name:"Remy", x:8, y:12, text:["Yo! Quick question — have you seen my 47 unread group texts?","You can’t pass until you admit: pineapple on pizza is superior."], delay: 1200},
+    {name:"Ryan", x:14, y:8, text:["Hold up, need to tell you about this 'one quick trick' to win at poker.","Spoiler: it's folding. Constantly."], delay: 1000},
+    {name:"Alex", x:17, y:6, text:["Wait, I changed the meetup time. Or did I? Let’s discuss for 3 minutes.","Also… where is Nick’s house again?"], delay: 1400},
+    {name:"Stephen", x:24, y:12, text:["Almost there! But first, watch my 12-minute tutorial on shuffling.","Part 1 of 8."], delay: 1600},
+  ];
+
+  const player = { x:5*TILE, y:12*TILE, w:12, h:12, speed:1.1, facing:'down' };
+
+  const totalMs = 120000;
+  let remaining = totalMs;
+  let bestMs = Number(localStorage.getItem('pokerDashBest') || 0);
+  document.getElementById('bestSpan').textContent = bestMs ? msToTime(bestMs) : '—';
+  let running = false;
+  let last = 0;
+  let victory = false;
+
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+  const howBtn = document.getElementById('howBtn');
+  startBtn.addEventListener('click', start);
+  howBtn.addEventListener('click', how);
+
+  let bestMs = Number(localStorage.getItem('pokerDashBest') || 0);
+  document.getElementById('bestSpan').textContent = bestMs ? msToTime(bestMs) : '—';
+
+  function frame(ts){
+    if (!running) return;
+    const dt = Math.min(48, ts - last); last = ts;
+    remaining -= dt;
+    if (remaining <= 0 && !victory){
+      running=false; timePill.classList.add('bad'); timePill.textContent = "Late! 5:00 PM";
+      overlay.style.display='grid';
+      overlay.querySelector('.title').textContent = "You’re late to Poker!";
+      overlay.querySelector('.subtitle').innerHTML = "Those chats got you. Try again and take the faster route.";
+      return;
+    }
+
+    timePill.textContent = "Time: " + gameClock(remaining);
+    timePill.classList.remove('bad'); timePill.classList.remove('good');
+
+    const sp = 1.1;
+    let dx=0, dy=0;
+    if (keys.has('ArrowUp')||keys.has('KeyW')||dirState.up)    dy -= sp;
+    if (keys.has('ArrowDown')||keys.has('KeyS')||dirState.down)dy += sp;
+    if (keys.has('ArrowLeft')||keys.has('KeyA')||dirState.left)dx -= sp;
+    if (keys.has('ArrowRight')||keys.has('KeyD')||dirState.right)dx += sp;
+
+    let nx = player.x + dx, ny = player.y;
+    if (!rectVsSolid(nx, ny)) player.x = nx;
+    nx = player.x; ny = player.y + dy;
+    if (!rectVsSolid(nx, ny)) player.y = ny;
+
+    let nearNPC = null;
+    for (const n of npcs){
+      const px = n.x*TILE, py = n.y*TILE;
+      const dist = Math.hypot((player.x - px), (player.y - py));
+      if (dist < 22){ nearNPC = n; break; }
+    }
+    if (nearNPC && !talkingTo){ showToast("Press A to talk"); }
+    if (nearNPC && (aPressed || keys.has('KeyZ')) && !talkingTo){
+      talkingTo = nearNPC;
+      const line = nearNPC.text[Math.floor(Math.random()*nearNPC.text.length)];
+      showDialog(nearNPC, line);
+      talkUntil = ts + (nearNPC.delay || 1200);
+    }
+    if (talkingTo && ts > talkUntil){
+      talkingTo = null; hideDialog();
+    }
+
+    const pTileX = Math.floor((player.x+player.w/2)/TILE);
+    const pTileY = Math.floor((player.y+player.h/2)/TILE);
+    if (!victory && pTileX===goalTile.x && pTileY===goalTile.y){
+      victory = true; running=false;
+      const finishedAt = totalMs - remaining;
+      if (!bestMs || finishedAt < bestMs){ bestMs = finishedAt; localStorage.setItem('pokerDashBest', String(bestMs)); }
+      document.getElementById('bestSpan').textContent = msToTime(bestMs);
+      timePill.classList.add('good');
+      overlay.style.display='grid';
+      overlay.querySelector('.title').textContent = "You made it to Nick’s by 5:00!";
+      overlay.querySelector('.subtitle').innerHTML = "Shuffle up and deal. <b>Finish time:</b> " + msToTime(finishedAt) + (bestMs===finishedAt ? " (new best!)" : "");
+      return;
+    }
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let i=0;i<80;i++){ pset((i*37 + ts*0.02)%canvas.width, (i*19 + ts*0.01)%canvas.height, i%7==0 ? "#1e2a3b" : "#0f1826"); }
+    for (let y=0;y<MAP_H;y++) for (let x=0;x<MAP_W;x++) drawTile(map[idx(x,y)], x, y);
+    npcs.forEach(drawNPC);
+    const gx = goalTile.x*TILE, gy = goalTile.y*TILE; rect(gx,gy,16,16,"#b1ffb1"); rect(gx+4,gy+4,8,8,"#0f3d1c");
+    drawPlayer();
+
+    requestAnimationFrame(frame);
+  }
+
+  function msToTime(ms){ const s = Math.max(0, Math.floor(ms/1000)); const m = Math.floor(s/60); const ss = (s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+  function gameClock(ms){
+    const frac = Math.max(0, ms/totalMs);
+    const minutes = Math.round(10 * frac);
+    const baseH = 4, baseM = 50;
+    let h=baseH, m=baseM + (minutes);
+    while (m>=60){ h++; m-=60; }
+    const ampm = h>=12 ? 'PM' : 'AM';
+    const hh = ((h-1)%12)+1;
+    return `${hh}:${m.toString().padStart(2,'0')} ${ampm}`;
+  }
+
+  
+  overlay.querySelector('.title').textContent = "Poker Dash: Suburban 5PM";
+  overlay.querySelector('.subtitle').innerHTML = "Make it to <b>Nick’s house</b> by 5:00 PM. Avoid time-sink chats.<br><small>Controls: Arrows/WASD + A (talk) · On-screen D‑Pad on phones</small>";
+  fit();
+})();
+</script>
+</body>
+</html>
